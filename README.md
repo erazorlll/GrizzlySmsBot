@@ -76,15 +76,15 @@ docker compose down
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
 | `GRIZZLY_API_KEY` | yes | — | Your Grizzly SMS API key. |
-| `SERVICE` | yes | — | Service code (`wx` = Apple). |
-| `COUNTRY` | yes | — | Country code (`62` = Turkey). |
-| `MAX_PRICE` | yes | — | Max bid; must be ≥ the platform minimum (else `WRONG_MAX_PRICE`). |
+| `SERVICE` | yes* | — | Service code (`wx` = Apple). |
+| `COUNTRY` | yes* | — | Country code (`62` = Turkey). |
+| `MAX_PRICE` | yes* | — | Max bid; must be ≥ the platform minimum (else `WRONG_MAX_PRICE`). |
 | `PROVIDER_IDS` | no | — | Comma-separated provider IDs; omitted when empty. |
 | `NTFY_URL` | one of† | — | ntfy topic URL. |
 | `DISCORD_WEBHOOK_URL` | one of† | — | Discord webhook URL. |
-| `THREADS` | yes | — | Number of worker threads. |
-| `MAX_REQUESTS_PER_SECOND` | yes | — | Global request rate shared by all workers. |
-| `REQUEST_TIMEOUT_SECONDS` | yes | — | HTTP timeout. |
+| `THREADS` | yes* | — | Number of worker threads. |
+| `MAX_REQUESTS_PER_SECOND` | yes* | — | Global request rate shared by all workers. |
+| `REQUEST_TIMEOUT_SECONDS` | yes* | 10 | HTTP timeout (defaults to 10s in `watch` mode). |
 | `MAX_ACQUISITIONS` | no | `1` | Numbers to keep; extras are cancelled + refunded. `0` = unlimited. |
 | `STATUS_EVERY_REQUESTS` | no | `100` | Progress-log cadence during acquisition. |
 | `STATUS_POLL_SECONDS` | no | `5` | Watch-phase poll interval. |
@@ -94,6 +94,10 @@ docker compose down
 
 † At least one of `NTFY_URL` / `DISCORD_WEBHOOK_URL` must be set. If both are set,
 notifications go to both.
+
+\* Required only for the acquire flow (`python -m grizzly`). The `watch`
+subcommand needs just `GRIZZLY_API_KEY` and a notifier (plus optional
+`STATUS_POLL_SECONDS` / `WATCH_TIMEOUT_SECONDS`).
 
 ## Running Without Docker
 

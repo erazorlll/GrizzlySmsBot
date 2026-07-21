@@ -105,11 +105,9 @@ class Notifier:
 
     def send(self, title: str, message: str, urgent: bool = False) -> bool:
         """Send to all backends; returns True if at least one succeeded."""
-        ok = False
         with self._lock:
-            for backend in self._backends:
-                ok = backend.send(title, message, urgent) or ok
-        return ok
+            results = [backend.send(title, message, urgent) for backend in self._backends]
+        return any(results)
 
     def close(self) -> None:
         for backend in self._backends:

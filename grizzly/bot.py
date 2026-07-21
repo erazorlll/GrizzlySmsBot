@@ -68,6 +68,11 @@ class Acquirer:
             self._fatal = True
             return True
 
+    @property
+    def fatal(self) -> bool:
+        """True if acquisition stopped on a fatal API response."""
+        return self._fatal
+
     def _decide(self, activation_id: str, phone: str) -> str:
         """Classify an acquired number as 'keep', 'cancel', or 'dup' (under lock)."""
         with self._lock:
@@ -137,6 +142,12 @@ class Acquirer:
                 client.cancel(activation_id)
             except requests.RequestException as error:
                 LOG.warning("cancel failed activation=%s: %s", activation_id, type(error).__name__)
+                self.notifier.send(
+                    "Extra number cancel FAILED",
+                    f"Manual cancellation needed: activation {activation_id} ({phone})",
+                    urgent=True,
+                )
+                return
             self.notifier.send(
                 "Extra number cancelled", f"Refunded activation {activation_id} ({phone})"
             )
@@ -178,6 +189,7 @@ class Watcher:
         self.config = config
         self.notifier = notifier
         self.client = GrizzlyClient(config.api_key, config.timeout, config.api_url)
+        self.limiter = RateLimiter(config.rate)
 
     def watch(self, activation_ids: list[str], shutdown: threading.Event) -> None:
         pending = set(activation_ids)
@@ -186,6 +198,8 @@ class Watcher:
         LOG.info("watching %s activation(s): %s", len(pending), ", ".join(sorted(pending)))
         while pending and not shutdown.is_set() and time.monotonic() < deadline:
             for activation_id in sorted(pending):
+                if not self.limiter.wait(shutdown):
+                    break
                 try:
                     body = self.client.get_status(activation_id)
                 except requests.RequestException as error:
@@ -221,8 +235,13 @@ class Watcher:
             if pending:
                 shutdown.wait(self.config.status_poll_seconds)
         if pending:
-            LOG.info("watch timeout — still waiting on: %s", ", ".join(sorted(pending)))
-            self.notifier.send("Watch timeout", f"Still waiting: {', '.join(sorted(pending))}")
+            remaining = ", ".join(sorted(pending))
+            if shutdown.is_set():
+                LOG.info("shutdown requested — still waiting on: %s", remaining)
+                self.notifier.send("Watch interrupted", f"Shutdown requested; still waiting: {remaining}")
+            else:
+                LOG.info("watch timeout — still waiting on: %s", remaining)
+                self.notifier.send("Watch timeout", f"Still waiting: {remaining}")
         else:
             LOG.info("all activations resolved")
 
@@ -245,8 +264,12 @@ def run(config: Config, notifier: Notifier, shutdown: threading.Event) -> int:
         f"Target service={cfg.service} country={cfg.country} maxPrice={cfg.max_price}\n"
         f"{cfg.workers} workers, limit {cfg.rate:g} req/s, stop after {stop_after} acquisition(s).",
     )
-    kept = Acquirer(cfg, notifier).run(shutdown)
+    acquirer = Acquirer(cfg, notifier)
+    kept = acquirer.run(shutdown)
     if not kept:
+        if acquirer.fatal:
+            LOG.info("stopped on a fatal response — exiting non-zero")
+            return 1
         LOG.info("no number acquired — exiting")
         return 0
     watcher = Watcher(cfg, notifier)
