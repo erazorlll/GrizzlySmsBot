@@ -80,6 +80,7 @@ docker compose down
 | `COUNTRY` | yes* | — | Country code (`62` = Turkey). |
 | `MAX_PRICE` | yes* | — | Max bid; must be ≥ the platform minimum (else `WRONG_MAX_PRICE`). |
 | `PROVIDER_IDS` | no | — | Comma-separated provider IDs; omitted when empty. |
+| `EXCEPT_PROVIDER_IDS` | no | — | Comma-separated provider IDs to exclude; omitted when empty. |
 | `NTFY_URL` | one of† | — | ntfy topic URL. |
 | `DISCORD_WEBHOOK_URL` | one of† | — | Discord webhook URL. |
 | `THREADS` | yes* | — | Number of worker threads. |

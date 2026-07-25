@@ -86,6 +86,7 @@ class Config:
     country: str | None = None
     max_price: str | None = None
     provider_ids: str | None = None
+    except_provider_ids: str | None = None
     workers: int = 1
     rate: float = 1.0
     max_acquisitions: int = 1
@@ -101,6 +102,7 @@ class Config:
             country=env_required("COUNTRY"),
             max_price=env_required("MAX_PRICE"),
             provider_ids=os.getenv("PROVIDER_IDS", "").strip() or None,
+            except_provider_ids=os.getenv("EXCEPT_PROVIDER_IDS", "").strip() or None,
             workers=env_int("THREADS"),
             rate=env_float("MAX_REQUESTS_PER_SECOND"),
             timeout=env_float("REQUEST_TIMEOUT_SECONDS", 1),
@@ -138,4 +140,6 @@ class Config:
         }
         if self.provider_ids:
             params["providerIds"] = self.provider_ids
+        if self.except_provider_ids:
+            params["exceptProviderIds"] = self.except_provider_ids
         return params

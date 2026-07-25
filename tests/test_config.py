@@ -2,7 +2,7 @@ import os
 import tempfile
 import unittest
 
-from grizzly.config import load_dotenv
+from grizzly.config import Config, load_dotenv
 
 
 class LoadDotenvTests(unittest.TestCase):
@@ -40,6 +40,22 @@ class LoadDotenvTests(unittest.TestCase):
 
     def test_missing_file_is_noop(self):
         load_dotenv("/nonexistent/path/to/.env")  # must not raise
+
+
+class ParamsTests(unittest.TestCase):
+    def test_omits_empty_provider_fields(self):
+        params = Config(api_key="k", service="wx", country="62", max_price="1").params
+        self.assertNotIn("providerIds", params)
+        self.assertNotIn("exceptProviderIds", params)
+
+    def test_includes_provider_fields(self):
+        params = Config(
+            api_key="k", service="wx", country="62", max_price="1",
+            provider_ids="385", except_provider_ids="12,25,311",
+        ).params
+        self.assertEqual(params["action"], "getNumber")
+        self.assertEqual(params["providerIds"], "385")
+        self.assertEqual(params["exceptProviderIds"], "12,25,311")
 
 
 if __name__ == "__main__":
