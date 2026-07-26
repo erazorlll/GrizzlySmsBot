@@ -1,75 +1,83 @@
 # Grizzly SMS Bot
 
-A small Docker tool that acquires an SMS-activation number from
-[Grizzly SMS](https://grizzlysms.com/) and then **watches it for the incoming SMS
-code**, all in one run. It notifies you over **ntfy and/or Discord**.
+Acquire a temporary phone number from [Grizzly SMS](https://grizzlysms.com/) and
+automatically **watch it for the incoming SMS code** — in a single run — with push
+notifications over **ntfy and/or Discord**.
 
-By default it targets **Apple** (`SERVICE=wx`) in **Turkey** (`COUNTRY=62`).
+Built for grabbing scarce numbers the moment they come in stock (e.g. **Apple in
+Turkey** — `SERVICE=wx`, `COUNTRY=62`) and relaying the verification code straight
+to your phone.
 
 > ⚠️ **Real purchases.** `getNumber` is not a stock check — every acquired number
 > reserves a real number and holds your Grizzly balance. A number that expires
-> without receiving an SMS is auto-refunded. Keep `MAX_ACQUISITIONS` low (default
-> `1`); extras won by a concurrency burst are cancelled and refunded automatically.
+> without an SMS is auto-refunded. `MAX_ACQUISITIONS` (default `1`) is a hard cap:
+> extras won by a concurrency burst are cancelled and refunded automatically.
+
+## Features
+
+- **One-shot flow** — acquire → watch for the SMS code → notify, no manual steps.
+- **Hard single-number guarantee** — burst-bought extras are cancelled (`setStatus=8`) and refunded.
+- **ntfy and/or Discord** — pick either or both; you choose simply by setting the URL(s).
+- **Rate-limited workers** — one shared limiter across threads, with a global backoff on HTTP / `429` errors.
+- **Fatal-response aware** — stops on `BAD_KEY` / `NO_BALANCE` / `WRONG_MAX_PRICE` and exits non-zero.
+- **Provider filtering** — target or exclude specific providers (`PROVIDER_IDS` / `EXCEPT_PROVIDER_IDS`).
+- **Auto-loads `.env`** — no `source .env` needed; zero third-party deps beyond `requests`.
+- **Watch-only mode** — re-attach to numbers you already own: `python -m grizzly watch <id> ...`.
 
 ## How It Works
 
-1. **Acquire** — several worker threads poll the Grizzly `getNumber` endpoint at a
-   shared rate limit. The moment a number is returned
-   (`ACCESS_NUMBER:<activation_id>:<phone>`), it is kept. `MAX_ACQUISITIONS` is a
-   **hard cap**: any extra number won in the same burst is cancelled (`setStatus=8`)
-   and refunded, so you keep exactly what you asked for.
-2. **Watch** — the tool then polls `getStatus` for the kept number until the SMS
-   arrives (`STATUS_OK:<code>`), the number expires (`STATUS_CANCEL`), or the watch
-   times out. You get a notification for the code.
+1. **Acquire** — worker threads poll `getNumber` at a shared rate limit. The first
+   number returned (`ACCESS_NUMBER:<id>:<phone>`) is kept; any extra won in the same
+   burst is cancelled and refunded, so you keep exactly `MAX_ACQUISITIONS`.
+2. **Watch** — the tool polls `getStatus` for the kept number until the code arrives
+   (`STATUS_OK:<code>`), the number expires (`STATUS_CANCEL`), or the watch times out.
 
-If Grizzly returns `NO_NUMBERS`, the bot keeps polling. On an HTTP error (incl.
-`429`) it backs the whole pool off briefly. On a fatal response (`BAD_KEY`,
-`NO_BALANCE`, or `WRONG_MAX_PRICE:<min>` when the bid is below the platform
-minimum), it notifies and stops acquiring.
+`NO_NUMBERS` → keep polling. HTTP / `429` → the whole pool backs off (honouring
+`Retry-After`). Fatal response (`BAD_KEY`, `NO_BALANCE`, `WRONG_MAX_PRICE:<min>`) →
+notify and stop.
 
 > The SMS only arrives once **you** enter the acquired number into the target
-> service (e.g. Apple). The watcher cannot conjure a code on its own.
+> service. The watcher relays the code — it can't conjure one.
 
-## Requirements
+## Project Layout
 
-- [Docker](https://www.docker.com/) with Docker Compose
-- A [Grizzly SMS](https://grizzlysms.com/) API key
-- A notification channel: an [ntfy](https://ntfy.sh/) topic URL and/or a Discord
-  webhook URL (at least one)
-
-## Quick Start
-
-```bash
-cp .env.example .env
+```
+grizzly/
+  __main__.py   # CLI entry point (full flow + `watch` subcommand)
+  config.py     # env parsing + .env auto-loader
+  notify.py     # ntfy / Discord backends + fan-out notifier
+  api.py        # Grizzly client, rate limiter, response parsing
+  bot.py        # Acquirer (workers + hard cap) and Watcher (SMS polling)
+tests/          # stdlib unittest, no network
 ```
 
-Edit `.env` with your own values (set `NTFY_URL` and/or `DISCORD_WEBHOOK_URL`):
-
-```env
-GRIZZLY_API_KEY=your_grizzly_api_key
-SERVICE=wx
-COUNTRY=62
-MAX_PRICE=1
-PROVIDER_IDS=
-
-NTFY_URL=https://ntfy.sh/your-topic
-DISCORD_WEBHOOK_URL=
-
-THREADS=10
-MAX_REQUESTS_PER_SECOND=5
-REQUEST_TIMEOUT_SECONDS=10
-MAX_ACQUISITIONS=1
-STATUS_POLL_SECONDS=5
-WATCH_TIMEOUT_SECONDS=1200
-```
-
-Run:
+## Quick Start (Docker)
 
 ```bash
+cp .env.example .env      # then edit it (see Configuration)
 docker compose up -d --build
 docker compose logs -f --tail=100
 docker compose down
 ```
+
+Set `NTFY_URL` and/or `DISCORD_WEBHOOK_URL` in `.env` (at least one is required).
+
+## Run Without Docker
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+# Full flow: acquire a number, then watch it for the SMS code
+python -m grizzly
+
+# Watch numbers you already own (no purchase)
+python -m grizzly watch 541507557 541507572
+```
+
+`.env` is auto-loaded from the current directory at startup — no `source .env`
+needed. Real environment variables still take precedence, and
+`GRIZZLY_ENV_FILE=/path/to/env` points at a different file.
 
 ## Configuration
 
@@ -79,7 +87,7 @@ docker compose down
 | `SERVICE` | yes* | — | Service code (`wx` = Apple). |
 | `COUNTRY` | yes* | — | Country code (`62` = Turkey). |
 | `MAX_PRICE` | yes* | — | Max bid; must be ≥ the platform minimum (else `WRONG_MAX_PRICE`). |
-| `PROVIDER_IDS` | no | — | Comma-separated provider IDs; omitted when empty. |
+| `PROVIDER_IDS` | no | — | Comma-separated provider IDs to target; omitted when empty. |
 | `EXCEPT_PROVIDER_IDS` | no | — | Comma-separated provider IDs to exclude; omitted when empty. |
 | `NTFY_URL` | one of† | — | ntfy topic URL. |
 | `DISCORD_WEBHOOK_URL` | one of† | — | Discord webhook URL. |
@@ -100,31 +108,10 @@ notifications go to both.
 subcommand needs just `GRIZZLY_API_KEY` and a notifier (plus optional
 `STATUS_POLL_SECONDS` / `WATCH_TIMEOUT_SECONDS`).
 
-## Running Without Docker
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-
-# Full flow: acquire a number, then watch it for the SMS code
-python -m grizzly
-
-# Watch already-owned activations only (no purchase)
-python -m grizzly watch 541507557 541507572
-```
-
-The bot **auto-loads `.env`** from the current directory at startup — no
-`source .env` needed. Real environment variables still take precedence, and
-`GRIZZLY_ENV_FILE=/path/to/env` points at a different file.
-
-## Tests
-
-No network, standard library only:
-
-```bash
-python -m unittest discover -s tests -t .
-```
+Service, country, and provider codes: see the Grizzly SMS
+[API docs](https://grizzlysms.com/docs-old), the
+[Apple service page](https://grizzlysms.com/apple), and the
+[price/country table](https://grizzlysms.com/price).
 
 ## Notifications
 
@@ -135,10 +122,19 @@ python -m unittest discover -s tests -t .
 | Extra number cancelled (refunded) | no |
 | SMS code received | yes |
 | Number expired | no |
-| Watch timeout | no |
+| Watch timeout / interrupted | no |
 | Fatal / stopped | yes |
 
-Service and country codes: see the Grizzly SMS
-[API documentation](https://grizzlysms.com/docs-old), the
-[Apple service page](https://grizzlysms.com/apple), and the
-[price/country table](https://grizzlysms.com/price).
+## Tests
+
+No network, standard library only:
+
+```bash
+python -m unittest discover -s tests -t .
+```
+
+## Notes
+
+- Repository: <https://github.com/kurosaki-sol/GrizzlySmsBot>
+- Use with your own Grizzly account and API key. You are responsible for how you
+  use temporary numbers and for complying with Grizzly SMS' terms of service.
