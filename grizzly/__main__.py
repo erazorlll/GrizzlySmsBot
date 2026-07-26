@@ -14,7 +14,7 @@ import sys
 import threading
 
 from .bot import Watcher, run
-from .config import Config
+from .config import Config, load_dotenv
 from .notify import Notifier
 
 LOG = logging.getLogger("grizzly")
@@ -29,6 +29,7 @@ def _setup_logging() -> None:
 
 def main(argv: list | None = None) -> int:
     argv = list(sys.argv[1:]) if argv is None else list(argv)
+    load_dotenv()  # auto-load .env from the working directory (env vars still win)
     _setup_logging()
 
     watch_mode = bool(argv) and argv[0] == "watch"

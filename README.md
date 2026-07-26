@@ -80,6 +80,7 @@ docker compose down
 | `COUNTRY` | yes* | — | Country code (`62` = Turkey). |
 | `MAX_PRICE` | yes* | — | Max bid; must be ≥ the platform minimum (else `WRONG_MAX_PRICE`). |
 | `PROVIDER_IDS` | no | — | Comma-separated provider IDs; omitted when empty. |
+| `EXCEPT_PROVIDER_IDS` | no | — | Comma-separated provider IDs to exclude; omitted when empty. |
 | `NTFY_URL` | one of† | — | ntfy topic URL. |
 | `DISCORD_WEBHOOK_URL` | one of† | — | Discord webhook URL. |
 | `THREADS` | yes* | — | Number of worker threads. |
@@ -105,7 +106,6 @@ subcommand needs just `GRIZZLY_API_KEY` and a notifier (plus optional
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-set -a && source .env && set +a
 
 # Full flow: acquire a number, then watch it for the SMS code
 python -m grizzly
@@ -113,6 +113,10 @@ python -m grizzly
 # Watch already-owned activations only (no purchase)
 python -m grizzly watch 541507557 541507572
 ```
+
+The bot **auto-loads `.env`** from the current directory at startup — no
+`source .env` needed. Real environment variables still take precedence, and
+`GRIZZLY_ENV_FILE=/path/to/env` points at a different file.
 
 ## Tests
 

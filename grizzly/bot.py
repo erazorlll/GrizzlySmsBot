@@ -254,9 +254,10 @@ def run(config: Config, notifier: Notifier, shutdown: threading.Event) -> int:
     cfg = config
     stop_after = cfg.max_acquisitions or "unlimited"
     LOG.info(
-        "startup service=%s country=%s maxPrice=%s providerIds=%s "
+        "startup service=%s country=%s maxPrice=%s providerIds=%s exceptProviderIds=%s "
         "workers=%s limit=%.1f/s stop_after=%s notify=%s",
         cfg.service, cfg.country, cfg.max_price, cfg.provider_ids or "none",
+        cfg.except_provider_ids or "none",
         cfg.workers, cfg.rate, stop_after, ",".join(notifier.backend_names),
     )
     notifier.send(

@@ -1,14 +1,16 @@
+import threading
 import unittest
 
 import requests
 
-from grizzly.bot import Acquirer
+from grizzly.bot import Acquirer, run
 from grizzly.config import Config
 
 
 class FakeNotifier:
     def __init__(self):
         self.sent = []
+        self.backend_names = ["fake"]
 
     def send(self, title, message, urgent=False):
         self.sent.append((title, message, urgent))
@@ -91,6 +93,20 @@ class CancelPathTests(unittest.TestCase):
         self.assertIn("extra", client.cancelled)
         self.assertIn("Extra number cancelled", titles)
         self.assertNotIn("Extra number cancel FAILED", titles)
+
+
+class RunStartupTests(unittest.TestCase):
+    def test_run_logs_startup_without_crashing(self):
+        config = Config(
+            api_key="k", service="wx", country="62", max_price="1",
+            provider_ids="385", except_provider_ids="12,25,311",
+            workers=0, rate=1.0, ntfy_url="x",
+        )
+        notifier = FakeNotifier()
+        rc = run(config, notifier, threading.Event())
+        self.assertEqual(rc, 0)
+        titles = [title for title, _, _ in notifier.sent]
+        self.assertIn("Grizzly SMS bot started", titles)
 
 
 if __name__ == "__main__":

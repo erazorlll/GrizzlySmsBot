@@ -8,6 +8,34 @@ from dataclasses import dataclass
 API_URL = "https://api.grizzlysms.com/stubs/handler_api.php"
 
 
+def load_dotenv(path: str | None = None) -> None:
+    """Load ``KEY=VALUE`` lines from a .env file into ``os.environ``.
+
+    Best-effort: a missing file is fine. Variables already present in the
+    environment are NOT overridden, so an explicit env var (or Docker's
+    ``env_file``) always wins over the .env file. Set ``GRIZZLY_ENV_FILE`` to
+    point at a different path.
+    """
+    path = path or os.getenv("GRIZZLY_ENV_FILE", ".env")
+    try:
+        with open(path, encoding="utf-8") as handle:
+            lines = handle.readlines()
+    except OSError:
+        return
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export "):]
+        key, sep, value = line.partition("=")
+        if not sep:
+            continue
+        key = key.strip()
+        if key:
+            os.environ.setdefault(key, value.strip().strip('"').strip("'"))
+
+
 def env_required(name: str) -> str:
     value = os.getenv(name, "").strip()
     if not value:
@@ -58,6 +86,7 @@ class Config:
     country: str | None = None
     max_price: str | None = None
     provider_ids: str | None = None
+    except_provider_ids: str | None = None
     workers: int = 1
     rate: float = 1.0
     max_acquisitions: int = 1
@@ -73,6 +102,7 @@ class Config:
             country=env_required("COUNTRY"),
             max_price=env_required("MAX_PRICE"),
             provider_ids=os.getenv("PROVIDER_IDS", "").strip() or None,
+            except_provider_ids=os.getenv("EXCEPT_PROVIDER_IDS", "").strip() or None,
             workers=env_int("THREADS"),
             rate=env_float("MAX_REQUESTS_PER_SECOND"),
             timeout=env_float("REQUEST_TIMEOUT_SECONDS", 1),
@@ -110,4 +140,6 @@ class Config:
         }
         if self.provider_ids:
             params["providerIds"] = self.provider_ids
+        if self.except_provider_ids:
+            params["exceptProviderIds"] = self.except_provider_ids
         return params
