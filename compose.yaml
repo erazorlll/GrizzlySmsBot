@@ -4,8 +4,6 @@ services:
     container_name: grizzlysms-bot
     restart: unless-stopped
     init: true
-    env_file:
-      - .env
     security_opt:
       - no-new-privileges:true
     cap_drop:
