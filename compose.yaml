@@ -8,3 +8,15 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    environment:
+      - GRIZZLY_API_KEY=${GRIZZLY_API_KEY:?GRIZZLY_API_KEY is required}
+      - SERVICE=${SERVICE:?SERVICE is required}
+      - COUNTRY=${COUNTRY:?COUNTRY is required}
+      - MAX_PRICE=${MAX_PRICE:?MAX_PRICE is required}
+      - PROVIDER_IDS=${PROVIDER_IDS:-}
+      - NTFY_URL=${NTFY_URL:?NTFY_URL is required}
+      - THREADS=${THREADS:?THREADS is required}
+      - MAX_REQUESTS_PER_SECOND=${MAX_REQUESTS_PER_SECOND:?MAX_REQUESTS_PER_SECOND is required}
+      - REQUEST_TIMEOUT_SECONDS=${REQUEST_TIMEOUT_SECONDS:?REQUEST_TIMEOUT_SECONDS is required}
+      - STATUS_EVERY_REQUESTS=${STATUS_EVERY_REQUESTS:-100}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
