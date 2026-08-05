@@ -20,6 +20,13 @@ the bot logs the number and sends a notification to ntfy.
 If Grizzly returns `NO_NUMBERS`, the bot keeps polling. If Grizzly returns an HTTP
 error, the bot pauses briefly before sending more requests.
 
+Separately, the bot checks live stock and price for `SERVICE`+`COUNTRY` via Grizzly's
+[`getPricesV3`](https://grizzlysms.com/docs/activation#activation-api-getPrices-v3)
+action — once at startup (included in the startup ntfy notification) and again every
+`PRICE_CHECK_INTERVAL_SECONDS`. This costs no balance and reserves no number, so it
+runs independently of the polling rate limit. See
+[Stock & price check](#stock--price-check) below.
+
 ## Requirements
 
 - [Docker](https://www.docker.com/) with Docker Compose
@@ -92,6 +99,7 @@ docker compose down
 | `REQUEST_TIMEOUT_SECONDS` | yes | HTTP timeout for Grizzly and ntfy requests. |
 | `STATUS_EVERY_REQUESTS` | no | Log a progress message every N requests. Defaults to `100`. |
 | `LOG_LEVEL` | no | Python logging level, for example `INFO` or `DEBUG`. |
+| `PRICE_CHECK_INTERVAL_SECONDS` | no | How often to re-check stock/price for `SERVICE`+`COUNTRY`. Defaults to `300` (5 minutes), minimum `10`. |
 | `GRIZZLY_API_URL` | no | Override the Grizzly API endpoint. Mostly useful for debugging. |
 
 ## Logs
@@ -131,6 +139,40 @@ Do not send `providerIds` at all:
 ```env
 PROVIDER_IDS=
 ```
+
+## Stock & price check
+
+The bot shows how many numbers are available and at what price for the configured
+`SERVICE`+`COUNTRY`, using Grizzly's
+[`getPricesV3`](https://grizzlysms.com/docs/activation#activation-api-getPrices-v3)
+action. This is a separate, free lookup — it does not reserve a number or spend
+balance, unlike `getNumber`.
+
+It runs:
+
+- **Once at startup**, logged and included in the startup ntfy notification.
+- **Every `PRICE_CHECK_INTERVAL_SECONDS`** (default 300s) in the background, logged only.
+
+Example log line:
+
+```text
+service=wx country=62 available=1307 price=2 providers=[311:820@2, 312:487@2.5/3]
+```
+
+`available` and `price` are the totals Grizzly reports for the service+country pair.
+`providers` breaks the same numbers down per provider ID — useful together with
+`PROVIDER_IDS`, since a provider can be in stock even when the total looks low, or vice
+versa. A provider's `price` can list more than one value; Grizzly returns a short list
+of price tiers per provider rather than a single number.
+
+The startup notification also tries to show human-readable service/country names (via
+`getServicesList`/`getCountries`) instead of just the codes. This is best-effort: if
+Grizzly's response for either lookup doesn't parse, the bot falls back to the raw codes
+and logs the reason at `DEBUG` — it never blocks the stock check itself.
+
+If Grizzly ever changes what these codes mean or price data isn't available for your
+account, `getPricesV3` returns `BAD_KEY`, `BAD_ACTION`, or `BAD_SERVICE`; the bot logs
+that exact reason rather than a generic failure.
 
 ## Tuning
 
