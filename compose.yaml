@@ -14,10 +14,21 @@ services:
       - COUNTRY=${COUNTRY:?COUNTRY is required}
       - MAX_PRICE=${MAX_PRICE:?MAX_PRICE is required}
       - PROVIDER_IDS=${PROVIDER_IDS:-}
-      - NTFY_URL=${NTFY_URL:?NTFY_URL is required}
+      - EXCEPT_PROVIDER_IDS=${EXCEPT_PROVIDER_IDS:-}
+      # NTFY_URL/DISCORD_WEBHOOK_URL: at least one required, enforced by the app
+      # (Notifier.from_config), not here -- either alone is a valid configuration.
+      - NTFY_URL=${NTFY_URL:-}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
       - THREADS=${THREADS:?THREADS is required}
       - MAX_REQUESTS_PER_SECOND=${MAX_REQUESTS_PER_SECOND:?MAX_REQUESTS_PER_SECOND is required}
       - REQUEST_TIMEOUT_SECONDS=${REQUEST_TIMEOUT_SECONDS:?REQUEST_TIMEOUT_SECONDS is required}
+      - MAX_ACQUISITIONS=${MAX_ACQUISITIONS:-1}
       - STATUS_EVERY_REQUESTS=${STATUS_EVERY_REQUESTS:-100}
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - STATUS_POLL_SECONDS=${STATUS_POLL_SECONDS:-5}
+      - WATCH_TIMEOUT_SECONDS=${WATCH_TIMEOUT_SECONDS:-1200}
       - PRICE_CHECK_INTERVAL_SECONDS=${PRICE_CHECK_INTERVAL_SECONDS:-300}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      # GRIZZLY_API_URL intentionally not forwarded: `Config` reads it via a plain
+      # `os.getenv(name, API_URL)` with no empty-string guard (unlike every other
+      # optional var above), so setting it to "" here would break the client's
+      # base URL instead of falling back to the default. Debug-only anyway.

@@ -11,8 +11,8 @@ RUN groupadd --gid 10001 bot \
 COPY requirements.txt ./
 RUN pip install --no-cache-dir --requirement requirements.txt
 
-COPY --chown=bot:bot bot.py ./
+COPY --chown=bot:bot grizzly ./grizzly
 
 USER bot
 
-CMD ["python", "-u", "bot.py"]
+CMD ["python", "-u", "-m", "grizzly"]
